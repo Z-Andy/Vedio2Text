@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>分层证据驱动的视频生成质量评估框架</title>
+  <style>
+    :root {
+      --paper: #fafaf8;
+      --ink: #0a0a0a;
+      --grey-1: #f0f0ee;
+      --grey-2: #d4d4d2;
+      --grey-3: #737373;
+      --accent: #002FA7;
+      --accent-on: #ffffff;
+      --red: #B22222;
+      --orange: #FF8C00;
+      --green: #228B22;
+      --font: "Inter", "Helvetica Neue", "Segoe UI", "Microsoft YaHei UI", "Noto Sans SC", Arial, sans-serif;
+      --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(10,10,10,.035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(10,10,10,.035) 1px, transparent 1px);
+      background-size: 48px 48px;
+      z-index: 0;
+    }
+
+    #deck {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      width: 1200vw;
+      height: 100vh;
+      transform: translateX(0);
+      transition: transform .55s cubic-bezier(.2,0,.38,.9);
+      z-index: 1;
+    }
+
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      flex: 0 0 100vw;
+      padding: 5.6vh 5vw 6.4vh;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--paper);
+    }
+
+    .slide.accent {
+      background: var(--accent);
+      color: var(--accent-on);
+    }
+
+    .slide.dark {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .chrome {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--grey-3);
+      margin-bottom: 5vh;
+    }
+
+    .accent .chrome, .dark .chrome {
+      color: rgba(255,255,255,.68);
+    }
+
+    .kicker {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.4vh;
+    }
+
+    .accent .kicker, .dark .kicker {
+      color: rgba(255,255,255,.78);
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    .hero-title {
+      font-size: min(8.4vw, 14.5vh);
+      line-height: .96;
+      font-weight: 200;
+      letter-spacing: 0;
+      max-width: 11em;
+    }
+
+    .title {
+      font-size: min(5.7vw, 9.6vh);
+      line-height: 1.03;
+      font-weight: 200;
+      letter-spacing: 0;
+      max-width: 10em;
+    }
+
+    .statement {
+      font-size: min(6.7vw, 11.2vh);
+      line-height: 1.02;
+      font-weight: 200;
+      letter-spacing: 0;
+      max-width: 12em;
+    }
+
+    .lead {
+      font-size: max(20px, 1.36vw);
+      line-height: 1.55;
+      font-weight: 400;
+      color: rgba(10,10,10,.78);
+      max-width: 46em;
+    }
+
+    .accent .lead, .dark .lead {
+      color: rgba(255,255,255,.84);
+    }
+
+    .body {
+      font-size: max(17px, 1.02vw);
+      line-height: 1.58;
+      color: rgba(10,10,10,.72);
+      font-weight: 400;
+    }
+
+    .dark .body {
+      color: rgba(255,255,255,.72);
+    }
+
+    .small {
+      font-size: max(15px, .86vw);
+      line-height: 1.5;
+      color: var(--grey-3);
+    }
+
+    .accent-line {
+      width: 120px;
+      height: 3px;
+      background: var(--accent);
+      margin: 0 0 3vh;
+    }
+
+    .accent .accent-line {
+      background: var(--accent-on);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4vw;
+      align-items: start;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2.2vw;
+      align-items: stretch;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.6vw;
+      align-items: stretch;
+    }
+
+    .cards-7 {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1vw;
+      margin-top: auto;
+    }
+
+    .card {
+      background: var(--grey-1);
+      border: 0;
+      padding: 2.4vh 1.8vw;
+      min-height: 22vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card.compact {
+      min-height: 15vh;
+      padding: 1.8vh 1.3vw;
+    }
+
+    .card.ink {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .card.accent {
+      background: var(--accent);
+      color: var(--accent-on);
+    }
+
+    .num {
+      font-family: var(--font);
+      font-size: min(4.6vw, 7.8vh);
+      line-height: .9;
+      font-weight: 200;
+      letter-spacing: 0;
+    }
+
+    .card-title {
+      font-size: max(20px, 1.45vw);
+      line-height: 1.24;
+      font-weight: 500;
+      margin-bottom: 1.2vh;
+    }
+
+    .tag {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--grey-3);
+    }
+
+    .accent .tag, .card.accent .tag, .card.ink .tag {
+      color: rgba(255,255,255,.72);
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1vw;
+      margin-top: 5vh;
+    }
+
+    .step {
+      border-top: 2px solid var(--ink);
+      padding-top: 1.4vh;
+      min-height: 20vh;
+    }
+
+    .step.active {
+      border-top-color: var(--accent);
+    }
+
+    .step .step-name {
+      font-size: max(18px, 1.25vw);
+      font-weight: 600;
+      margin: 1vh 0;
+    }
+
+    .video-box {
+      background: var(--ink);
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .table {
+      display: grid;
+      gap: 0;
+      border-top: 2px solid var(--ink);
+      font-size: max(15px, .92vw);
+      line-height: 1.48;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1.25fr 1.25fr 2fr;
+      gap: 1.4vw;
+      padding: 1.4vh 0;
+      border-bottom: 1px solid var(--grey-2);
+      align-items: start;
+    }
+
+    .row.head {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--grey-3);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: .35em .55em;
+      background: var(--ink);
+      color: var(--paper);
+      font-size: max(14px, .82vw);
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    .pill.blue {
+      background: var(--accent);
+      color: var(--accent-on);
+    }
+
+    .code {
+      font-family: var(--mono);
+      font-size: max(14px, .84vw);
+      line-height: 1.55;
+      background: var(--grey-1);
+      padding: 2vh 1.5vw;
+      white-space: pre-wrap;
+    }
+
+    .metric-bars {
+      display: grid;
+      gap: 1.6vh;
+      margin-top: 2.4vh;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 9em 1fr 5em;
+      align-items: center;
+      gap: 1vw;
+      font-size: max(15px, .94vw);
+    }
+
+    .bar {
+      height: 16px;
+      background: var(--grey-2);
+      position: relative;
+    }
+
+    .bar > i {
+      position: absolute;
+      inset: 0 auto 0 0;
+      display: block;
+      background: var(--accent);
+    }
+
+    .foot {
+      margin-top: auto;
+      border-top: 1px solid var(--grey-2);
+      padding-top: 1.8vh;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--grey-3);
+      letter-spacing: .08em;
+    }
+
+    .accent .foot, .dark .foot {
+      border-color: rgba(255,255,255,.22);
+      color: rgba(255,255,255,.58);
+    }
+
+    #nav {
+      position: fixed;
+      left: 50%;
+      bottom: 2vh;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #nav button {
+      width: 8px;
+      height: 8px;
+      border: 0;
+      padding: 0;
+      background: var(--grey-2);
+      cursor: pointer;
+    }
+
+    #nav button.active {
+      width: 28px;
+      background: var(--accent);
+    }
+
+    .index {
+      position: fixed;
+      right: 2.4vw;
+      bottom: 1.7vh;
+      z-index: 10;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--grey-3);
+      letter-spacing: .08em;
+    }
+  </style>
+</head>
+<body>
+  <main id="deck">
+    <section class="slide accent" data-layout="S01">
+      <div class="chrome">
+        <div>分层证据驱动 · 视频生成质量评估</div>
+        <div>01 / 12</div>
+      </div>
+      <div class="kicker">方法汇报</div>
+      <h1 class="hero-title" style="font-size:min(7.4vw,13vh);max-width:12em">分层证据驱动的视频生成质量评估框架</h1>
+      <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:4vw;border-top:1px solid rgba(255,255,255,.22);padding-top:2.4vh">
+        <p class="lead">将多模态视频解析拆分为宏观层、片段层、逐帧层，再由裁判模型基于文本证据完成标签归因。</p>
+        <div class="small" style="color:rgba(255,255,255,.72);align-self:end">素材来源：项目记录、Prompt 文件夹、sample/Vedio.mp4、sample/analysis、sample/labels</div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S03">
+      <div class="chrome">
+        <div>背景 · 研究动机</div>
+        <div>02 / 12</div>
+      </div>
+      <div class="accent-line"></div>
+      <h2 class="statement">视频质量评估的难点，不只是“看懂视频”，而是把错误归因到可复核标签。</h2>
+      <div class="grid-3" style="margin-top:6vh">
+        <div class="card compact">
+          <div class="tag">人工评价</div>
+          <div>
+            <h3 class="card-title">可信但难规模化</h3>
+            <p class="body">人工复审成本高，批量视频下难以保持稳定口径。</p>
+          </div>
+        </div>
+        <div class="card compact">
+          <div class="tag">端到端大模型</div>
+          <div>
+            <h3 class="card-title">快速但证据链弱</h3>
+            <p class="body">直接输入视频输出标签，容易出现幻觉、遗漏和标签混淆。</p>
+          </div>
+        </div>
+        <div class="card compact accent">
+          <div class="tag">本项目路径</div>
+          <div>
+            <h3 class="card-title">先描述，后裁判</h3>
+            <p class="body" style="color:rgba(255,255,255,.82)">先构造可审计文本证据，再进行标签判断与错因归纳。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S18">
+      <div class="chrome">
+        <div>多模态视频解析 · 技术约束</div>
+        <div>03 / 12</div>
+      </div>
+      <div class="kicker">抽帧 · 视觉表征 · 语言对齐</div>
+      <h2 class="title">模型并非逐帧穷举读取视频</h2>
+      <div class="grid-3" style="margin-top:6vh">
+        <div>
+          <div class="num">01</div>
+          <h3 class="card-title">采样限制</h3>
+          <p class="body">视频先被抽帧或片段采样，短暂出现的局部错误可能不会进入模型上下文。</p>
+        </div>
+        <div>
+          <div class="num">02</div>
+          <h3 class="card-title">表征压缩</h3>
+          <p class="body">视觉编码器将连续画面压缩为视觉特征，细粒度文字、手部和结构异常易被弱化。</p>
+        </div>
+        <div>
+          <div class="num" style="color:var(--accent)">03</div>
+          <h3 class="card-title">语义幻觉</h3>
+          <p class="body">语言模型可能在证据不足时补全不存在的对象、动作或场景，影响后续判定。</p>
+        </div>
+      </div>
+      <div class="foot">
+        <span>参考：Flamingo、Video-ChatGPT、Video-LLaVA、POPE、MVBench、Video-MME</span>
+        <span>项目记录.md · 1.1 / 1.2</span>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S11">
+      <div class="chrome">
+        <div>系统流程</div>
+        <div>04 / 12</div>
+      </div>
+      <div class="kicker">数据流向</div>
+      <h2 class="title">从视频输入到结构化错因输出</h2>
+      <div class="pipeline">
+        <div class="step active">
+          <div class="tag">01</div>
+          <div class="step-name">原始输入</div>
+          <p class="body">Vedio.mp4、Prompt.md、标签体系与三层提示词。</p>
+        </div>
+        <div class="step">
+          <div class="tag">02</div>
+          <div class="step-name">三层描述</div>
+          <p class="body">宏观层、片段层、逐帧层生成事实描述，不输出标签。</p>
+        </div>
+        <div class="step">
+          <div class="tag">03</div>
+          <div class="step-name">分批裁判</div>
+          <p class="body">按一级标签输入二级标签定义、原始提示词和对应层证据。</p>
+        </div>
+        <div class="step">
+          <div class="tag">04</div>
+          <div class="step-name">去重归因</div>
+          <p class="body">判断新增、替换、保留或移除，减少同一错因重复打标。</p>
+        </div>
+        <div class="step active">
+          <div class="tag">05</div>
+          <div class="step-name">最终 JSON</div>
+          <p class="body">输出“一级标签--二级标签”“证据来源”“错因描述”。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S05">
+      <div class="chrome">
+        <div>三层权责</div>
+        <div>05 / 12</div>
+      </div>
+      <div class="kicker">描述层不可见标签</div>
+      <h2 class="title">每一层只记录事实，不提前判断对错</h2>
+      <div class="grid-3" style="margin-top:5vh">
+        <div class="card">
+          <div class="num">宏观</div>
+          <div>
+            <h3 class="card-title">全片稳定事实</h3>
+            <p class="body">主体、场景、风格、全局事件、整体音频、敏感内容摘要。</p>
+          </div>
+          <div class="tag">macro_prompt.md</div>
+        </div>
+        <div class="card accent">
+          <div class="num">片段</div>
+          <div>
+            <h3 class="card-title">时间过程事实</h3>
+            <p class="body" style="color:rgba(255,255,255,.82)">动作过程、事件顺序、相邻片段变化、接触关系和音画时间关系。</p>
+          </div>
+          <div class="tag">segment_prompt.md</div>
+        </div>
+        <div class="card">
+          <div class="num">逐帧</div>
+          <div>
+            <h3 class="card-title">局部可见事实</h3>
+            <p class="body">单帧主体、局部结构、文字识别、清晰度、构图、相邻帧变化。</p>
+          </div>
+          <div class="tag">frame_prompt.md</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S15">
+      <div class="chrome">
+        <div>质量标签本体</div>
+        <div>06 / 12</div>
+      </div>
+      <div class="kicker">labels.json</div>
+      <h2 class="title">7 个一级标签，31 个二级标签</h2>
+      <div class="cards-7">
+        <div class="card compact"><div class="tag">01</div><h3 class="card-title">提示词一致性</h3><p class="small">主体、属性、动作、场景、风格</p></div>
+        <div class="card compact"><div class="tag">02</div><h3 class="card-title">视觉生成质量</h3><p class="small">清晰度、结构、局部失败、伪影</p></div>
+        <div class="card compact"><div class="tag">03</div><h3 class="card-title">时间一致性</h3><p class="small">角色、物体、场景、动作、事件</p></div>
+        <div class="card compact"><div class="tag">04</div><h3 class="card-title">物理真实性</h3><p class="small">人体、物体、碰撞、自然现象</p></div>
+        <div class="card compact"><div class="tag">05</div><h3 class="card-title">音频生成质量</h3><p class="small">台词、同步、失真、情绪、环境音</p></div>
+        <div class="card compact"><div class="tag">06</div><h3 class="card-title">审美质量</h3><p class="small">构图、镜头、色彩、节奏</p></div>
+        <div class="card compact accent"><div class="tag">07</div><h3 class="card-title">安全与合规</h3><p class="small" style="color:rgba(255,255,255,.78)">暴力、色情、隐私、版权</p></div>
+      </div>
+      <div class="foot">
+        <span>标签定义包含定义、正例、反例，用于约束边界</span>
+        <span>Prompt/labels.json</span>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S22">
+      <div class="chrome">
+        <div>样本演示</div>
+        <div>07 / 12</div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <div class="kicker">sample/Vedio.mp4</div>
+          <div class="video-box">
+            <video controls preload="metadata" src="../sample/Vedio.mp4"></video>
+          </div>
+          <p class="small" style="margin-top:1.2vh">浏览器打开后可直接播放样本视频；该页作为视觉证据入口。</p>
+        </div>
+        <div>
+          <h2 class="title" style="font-size:min(4.6vw,8vh)">真人古装写实短片</h2>
+          <div class="code" style="margin-top:3vh">核心要求：
+清晨薄雾中的古代庭院；
+年轻女书生，浅青色交领长衫，木簪束发；
+右手拿起淡黄色竹简，左手按住毛笔；
+竹简展开时出现清晰黑色文字“古风测试”；
+水缸倒影、竹叶落下、动作连续、画面清晰。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S16">
+      <div class="chrome">
+        <div>证据抽取</div>
+        <div>08 / 12</div>
+      </div>
+      <div class="kicker">提示词要素核对</div>
+      <h2 class="title">先提取核心要素，再记录有、无、不可见、未知</h2>
+      <div class="grid-3" style="margin-top:5vh">
+        <div class="card">
+          <div class="tag">宏观层</div>
+          <div>
+            <h3 class="card-title">全局要素</h3>
+            <p class="body">确认古代庭院、浅青色服装、淡黄色竹简、无受限内容；指出未出现“古风测试”字样。</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tag">片段层</div>
+          <div>
+            <h3 class="card-title">过程要素</h3>
+            <p class="body">记录 0-3 秒展开竹简，3-5 秒低头阅读，5-8 秒侧视角、水缸与竹叶元素。</p>
+          </div>
+        </div>
+        <div class="card accent">
+          <div class="tag">逐帧层</div>
+          <div>
+            <h3 class="card-title">关键细节</h3>
+            <p class="body" style="color:rgba(255,255,255,.82)">帧3：竹简文字模糊不可读，人物头部顶部被裁切；帧4-5：发型变化为辫子。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S19">
+      <div class="chrome">
+        <div>裁判输出</div>
+        <div>09 / 12</div>
+      </div>
+      <div class="kicker">sample/labels/final_labels.json</div>
+      <h2 class="title">最终只保留标签对、证据来源和错因描述</h2>
+      <div class="table" style="margin-top:4vh">
+        <div class="row head">
+          <div>一级标签--二级标签</div>
+          <div>证据来源</div>
+          <div>错因描述</div>
+        </div>
+        <div class="row">
+          <div><span class="pill blue">提示词一致性--属性错误</span></div>
+          <div>逐帧层 · 帧3</div>
+          <div>提示词要求竹简有清晰黑色文字“古风测试”，但帧3中文字模糊不可读，未识别到指定字样。</div>
+        </div>
+        <div class="row">
+          <div><span class="pill blue">提示词一致性--动作错误</span></div>
+          <div>逐帧层 · 帧3-5</div>
+          <div>未出现“左手按住毛笔”的指定动作，且桌面出现非指定剪刀类物件。</div>
+        </div>
+        <div class="row">
+          <div><span class="pill">时间一致性--角色突变</span></div>
+          <div>逐帧层 · 帧1-3 vs 帧4-5</div>
+          <div>人物发型从木簪束发无原因变化为辫子。</div>
+        </div>
+        <div class="row">
+          <div><span class="pill">审美质量--构图问题</span></div>
+          <div>逐帧层 · 帧3</div>
+          <div>人物头部顶部被画面上边缘裁切，影响主体完整性。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S08">
+      <div class="chrome">
+        <div>方法改进</div>
+        <div>10 / 12</div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <div class="kicker">旧问题</div>
+          <h2 class="title">端到端打标容易把同一现象反复归因</h2>
+          <div class="metric-bars">
+            <div class="bar-row"><span>标签混淆</span><div class="bar"><i style="width:78%"></i></div><span>高风险</span></div>
+            <div class="bar-row"><span>证据缺口</span><div class="bar"><i style="width:64%"></i></div><span>中高</span></div>
+            <div class="bar-row"><span>上下文压力</span><div class="bar"><i style="width:72%"></i></div><span>高风险</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="kicker">当前策略</div>
+          <div class="card" style="min-height:auto;margin-bottom:2vh">
+            <h3 class="card-title">按一级标签分批裁判</h3>
+            <p class="body">每批只输入当前标签定义、原始提示词和对应层证据，降低上下文压力。</p>
+          </div>
+          <div class="card" style="min-height:auto;margin-bottom:2vh">
+            <h3 class="card-title">携带已有标签结果</h3>
+            <p class="body">后续批次判断同一错因是否已被覆盖，尽量选择替换或保留，避免无意义并列。</p>
+          </div>
+          <div class="card accent" style="min-height:auto">
+            <h3 class="card-title">开启思考模式</h3>
+            <p class="body" style="color:rgba(255,255,255,.82)">裁判模型先描述错误点，再选择最贴切标签，最终输出紧凑 JSON。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-layout="S14">
+      <div class="chrome">
+        <div>局限与迭代</div>
+        <div>11 / 12</div>
+      </div>
+      <div class="kicker">自适应采样</div>
+      <h2 class="title">逐帧层不是全帧穷举，细粒度错误仍可能漏检</h2>
+      <div class="grid-2" style="margin-top:5vh">
+        <div class="card ink">
+          <div class="tag">局限</div>
+          <h3 class="card-title">均匀抽帧会错过瞬时异常</h3>
+          <p class="body" style="color:rgba(255,255,255,.76)">例如手部一帧畸变、物体短暂穿模、文字瞬时错误、角色五官闪烁，可能不在采样帧中出现。</p>
+        </div>
+        <div class="card">
+          <div class="tag">改进路径</div>
+          <h3 class="card-title">均匀采样 + 变化点采样 + 异常片段加密采样</h3>
+          <p class="body">优先选择画面骤变帧、语义不稳定片段，以及宏观层或片段层提示异常的时间段，再进行二次采样复核。</p>
+        </div>
+      </div>
+      <div class="pipeline" style="grid-template-columns:repeat(4,1fr);margin-top:4vh">
+        <div class="step"><div class="tag">01</div><div class="step-name">均匀采样</div><p class="body">形成基础覆盖。</p></div>
+        <div class="step active"><div class="tag">02</div><div class="step-name">变化检测</div><p class="body">定位镜头、姿态、亮度和结构突变。</p></div>
+        <div class="step"><div class="tag">03</div><div class="step-name">异常加密</div><p class="body">对可疑片段补充更多关键帧。</p></div>
+        <div class="step active"><div class="tag">04</div><div class="step-name">回填证据</div><p class="body">更新三层描述与裁判依据。</p></div>
+      </div>
+    </section>
+
+    <section class="slide dark" data-layout="S10">
+      <div class="chrome">
+        <div>结论</div>
+        <div>12 / 12</div>
+      </div>
+      <div class="kicker">Takeaways</div>
+      <h2 class="hero-title" style="font-size:min(7.4vw,13vh)">把视频错误变成可追溯证据链</h2>
+      <div class="grid-3" style="margin-top:auto">
+        <div>
+          <div class="num" style="color:var(--accent)">01</div>
+          <h3 class="card-title">描述层负责事实</h3>
+          <p class="body">不让分析层提前看到标签，减少先入为主的判断。</p>
+        </div>
+        <div>
+          <div class="num" style="color:var(--accent)">02</div>
+          <h3 class="card-title">裁判层负责归因</h3>
+          <p class="body">基于 Prompt、标签定义和三层证据做结构化打标。</p>
+        </div>
+        <div>
+          <div class="num" style="color:var(--accent)">03</div>
+          <h3 class="card-title">看板负责迭代</h3>
+          <p class="body">用准确率、召回率和错因分布持续发现标签边界问题。</p>
+        </div>
+      </div>
+      <div class="foot">
+        <span>分层证据驱动的视频生成质量评估框架</span>
+        <span>END</span>
+      </div>
+    </section>
+  </main>
+
+  <nav id="nav" aria-label="幻灯片导航"></nav>
+  <div class="index" id="index">01 / 12</div>
+
+  <script>
+    const deck = document.getElementById("deck");
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    const nav = document.getElementById("nav");
+    const index = document.getElementById("index");
+    let current = 0;
+
+    slides.forEach((_, i) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("aria-label", `第 ${i + 1} 页`);
+      button.addEventListener("click", () => go(i));
+      nav.appendChild(button);
+    });
+
+    function go(i) {
+      current = Math.max(0, Math.min(slides.length - 1, i));
+      deck.style.transform = `translateX(${-current * 100}vw)`;
+      Array.from(nav.children).forEach((button, idx) => {
+        button.classList.toggle("active", idx === current);
+      });
+      index.textContent = `${String(current + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
+    }
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") go(current + 1);
+      if (event.key === "ArrowLeft" || event.key === "PageUp") go(current - 1);
+      if (event.key === "Home") go(0);
+      if (event.key === "End") go(slides.length - 1);
+    });
+
+    window.addEventListener("wheel", (event) => {
+      if (Math.abs(event.deltaY) < 40) return;
+      go(current + (event.deltaY > 0 ? 1 : -1));
+    }, { passive: true });
+
+    let touchX = null;
+    window.addEventListener("touchstart", (event) => {
+      touchX = event.touches[0]?.clientX ?? null;
+    }, { passive: true });
+    window.addEventListener("touchend", (event) => {
+      if (touchX === null) return;
+      const endX = event.changedTouches[0]?.clientX ?? touchX;
+      const dx = endX - touchX;
+      if (Math.abs(dx) > 50) go(current + (dx < 0 ? 1 : -1));
+      touchX = null;
+    }, { passive: true });
+
+    go(0);
+  </script>
+</body>
+</html>

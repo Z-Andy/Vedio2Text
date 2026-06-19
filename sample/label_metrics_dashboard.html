@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>分层证据驱动的视频生成质量评估看板</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #5f6b7a;
+      --line: #d7dde5;
+      --paper: #f7f8fa;
+      --panel: #ffffff;
+      --blue: #0047ff;
+      --green: #228b22;
+      --red: #b22222;
+      --amber: #ff8c00;
+      --fill: #eef2f7;
+      --shadow: 0 1px 2px rgba(17, 24, 39, .06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Inter", "Helvetica Neue", "Microsoft YaHei UI", "Noto Sans SC", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+    }
+
+    aside {
+      border-right: 1px solid var(--line);
+      background: #fff;
+      padding: 24px 20px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    main {
+      padding: 24px;
+      min-width: 0;
+    }
+
+    .brand {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      color: var(--blue);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.18;
+      font-weight: 760;
+    }
+
+    .desc {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+      margin: 0;
+    }
+
+    .filter-group {
+      display: grid;
+      gap: 10px;
+      margin: 18px 0 24px;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2c3645;
+    }
+
+    select,
+    input[type="search"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      height: 40px;
+      padding: 0 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    select:focus,
+    input[type="search"]:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(0, 71, 255, .12);
+    }
+
+    .checks {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .checks span {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checks input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--blue);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      min-height: 112px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .metric .value {
+      margin-top: 14px;
+      font-size: 32px;
+      line-height: 1;
+      font-weight: 780;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric .note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 18px 0 12px;
+    }
+
+    .toolbar h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      height: 36px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: var(--blue); }
+
+    .table-wrap {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead {
+      background: #f0f3f7;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 11px 12px;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th .sort {
+      color: var(--muted);
+      margin-left: 4px;
+      font-size: 11px;
+    }
+
+    tbody tr:hover { background: #f8fafc; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: var(--fill);
+      color: #1f2937;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .pair {
+      display: grid;
+      gap: 4px;
+      min-width: 180px;
+    }
+
+    .pair strong {
+      font-size: 14px;
+    }
+
+    .pair small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .num {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    td.num, th.num { text-align: right; }
+
+    .rate {
+      min-width: 120px;
+    }
+
+    .bar {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      align-items: center;
+      gap: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .track {
+      display: block;
+      height: 8px;
+      background: #e6ebf2;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .fill {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--green);
+      border-radius: inherit;
+      transition: width .2s ease;
+    }
+
+    .fill.mid { background: var(--amber); }
+    .fill.low { background: var(--red); }
+
+    .footnote {
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1100px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        position: static;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+    }
+
+    @media (max-width: 720px) {
+      main { padding: 16px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .toolbar { align-items: flex-start; flex-direction: column; }
+      .table-wrap { overflow-x: auto; }
+      th, td { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">
+        <div class="eyebrow">HiEVA-Onto Evaluation Dashboard</div>
+        <h1>标签级评估看板</h1>
+      </div>
+
+      <div class="filter-group">
+        <label for="datasetVersion">数据版本</label>
+        <select id="datasetVersion">
+          <option value="baseline">第一版：低基线</option>
+          <option value="improved">第二版：温和提升</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="primaryFilter">一级标签</label>
+        <select id="primaryFilter"></select>
+      </div>
+
+      <div class="filter-group">
+        <label for="searchInput">搜索标签</label>
+        <input id="searchInput" type="search" placeholder="输入一级或二级标签" />
+      </div>
+
+      <div class="filter-group">
+        <label>显示选项</label>
+        <div class="checks">
+          <span><input id="hideZeroSupport" type="checkbox" checked />隐藏无人标正例标签</span>
+          <span><input id="showLowOnly" type="checkbox" />只看 F1 低于 80%</span>
+        </div>
+      </div>
+
+      <p class="footnote" id="versionNote">指标定义：准确率 = TP / (TP + FP)，召回率 = TP / (TP + FN)，F1 = 2PR / (P + R)。</p>
+    </aside>
+
+    <main>
+      <section class="summary-grid">
+        <div class="metric">
+          <div class="label">视频总量</div>
+          <div class="value" id="videoCount">100</div>
+          <div class="note">真人与链路双标注样本</div>
+        </div>
+        <div class="metric">
+          <div class="label">宏平均准确率</div>
+          <div class="value" id="macroPrecision">--</div>
+          <div class="note">按标签等权平均</div>
+        </div>
+        <div class="metric">
+          <div class="label">宏平均召回率</div>
+          <div class="value" id="macroRecall">--</div>
+          <div class="note">按标签等权平均</div>
+        </div>
+        <div class="metric">
+          <div class="label">微平均 F1</div>
+          <div class="value" id="microF1">--</div>
+          <div class="note">全标签 TP/FP/FN 汇总</div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <h2>逐标签指标</h2>
+        <div class="button-row">
+          <button id="resetSort">重置排序</button>
+          <button id="downloadCsv">导出 CSV</button>
+        </div>
+      </div>
+
+      <section class="table-wrap">
+        <table id="metricTable">
+          <thead>
+            <tr>
+              <th data-key="primary">一级标签<span class="sort"></span></th>
+              <th data-key="secondary">二级标签<span class="sort"></span></th>
+              <th class="num" data-key="support">人标正例<span class="sort"></span></th>
+              <th class="num" data-key="predicted">链路命中<span class="sort"></span></th>
+              <th class="num" data-key="tp">TP<span class="sort"></span></th>
+              <th class="num" data-key="fp">FP<span class="sort"></span></th>
+              <th class="num" data-key="fn">FN<span class="sort"></span></th>
+              <th class="num" data-key="precision">准确率<span class="sort"></span></th>
+              <th class="num" data-key="recall">召回率<span class="sort"></span></th>
+              <th class="num" data-key="f1">F1<span class="sort"></span></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const labelOntology = {
+      "提示词一致性": ["主体错误", "属性错误", "动作错误", "场景错误", "风格错误"],
+      "视觉生成质量": ["清晰度缺陷", "结构畸变", "局部生成失败", "视觉伪影"],
+      "时间一致性": ["角色突变", "物体突变", "场景突变", "动作断裂", "事件断裂"],
+      "物理真实性": ["人体运动异常", "物体运动异常", "碰撞与接触错误", "自然现象错误"],
+      "音频生成质量": ["台词错误", "音画同步错误", "音频失真", "情绪表达错误", "环境音错误"],
+      "审美质量": ["构图问题", "镜头设计问题", "色彩问题", "节奏问题"],
+      "安全与合规": ["暴力违规", "色情违规", "隐私违规", "版权违规"]
+    };
+
+    const labelRows = Object.entries(labelOntology).flatMap(([primary, labels]) =>
+      labels.map((secondary, index) => ({
+        primary,
+        secondary,
+        label: `${primary}--${secondary}`,
+        index
+      }))
+    );
+
+    function hashText(text) {
+      let hash = 2166136261;
+      for (let i = 0; i < text.length; i += 1) {
+        hash ^= text.charCodeAt(i);
+        hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+      }
+      return Math.abs(hash >>> 0);
+    }
+
+    function score(videoId, label, salt) {
+      return (hashText(`${videoId}|${label}|${salt}`) % 1000) / 1000;
+    }
+
+    const datasetProfiles = {
+      baseline: {
+        note: "第一版：召回率最高不超过 70%，准确率最高不超过 30%；每个标签的链路命中数量比第二版多 20-25，用于体现模型反复归因带来的低准确率问题。",
+        recallCap: 0.70,
+        precisionCap: 0.30,
+        recallBonus: -0.03,
+        precisionBonus: 0.08,
+        overAttribution: 1,
+        highRecallLabels: [],
+        highPrecisionLabels: [],
+        greenPrecisionLabels: [],
+        orangePrecisionLabels: [],
+        redBothLabels: []
+      },
+      improved: {
+        note: "第二版：整体趋势保持一致，少数客观标签召回率达到 90%+，少数标签准确率达到 50%+，提升较温和。",
+        recallCap: 0.92,
+        precisionCap: 0.55,
+        recallBonus: 0.16,
+        precisionBonus: 0.14,
+        overAttribution: 1,
+        highRecallLabels: [
+          "提示词一致性--属性错误",
+          "提示词一致性--动作错误",
+          "视觉生成质量--结构畸变",
+          "时间一致性--角色突变"
+        ],
+        highPrecisionLabels: [
+          "提示词一致性--属性错误",
+          "视觉生成质量--结构畸变",
+          "音频生成质量--台词错误"
+        ],
+        greenPrecisionLabels: [
+          "音频生成质量--台词错误",
+          "提示词一致性--主体错误",
+          "提示词一致性--动作错误"
+        ],
+        orangePrecisionLabels: [
+          "时间一致性--角色突变",
+          "时间一致性--场景突变",
+          "时间一致性--物体突变",
+          "音频生成质量--音画同步错误",
+          "安全与合规--版权违规"
+        ],
+        redBothLabels: [
+          "视觉生成质量--清晰度缺陷",
+          "音频生成质量--情绪表达错误"
+        ]
+      }
+    };
+
+    function supportCount(primary, secondary) {
+      const base = {
+        "提示词一致性": 30,
+        "视觉生成质量": 24,
+        "时间一致性": 20,
+        "物理真实性": 18,
+        "音频生成质量": 14,
+        "审美质量": 17,
+        "安全与合规": 8
+      };
+      const jitter = hashText(`support|${primary}|${secondary}`) % 9;
+      return Math.max(4, Math.min(42, base[primary] + jitter - 4));
+    }
+
+    function objectiveStrength(primary, secondary) {
+      let value = 0.34;
+      if (primary === "提示词一致性") value += 0.18;
+      if (primary === "视觉生成质量") value += 0.14;
+      if (primary === "音频生成质量") value += 0.10;
+      if (primary === "时间一致性") value += 0.06;
+      if (primary === "物理真实性") value += 0.04;
+      if (primary === "审美质量") value -= 0.10;
+      if (primary === "安全与合规") value -= 0.04;
+      if (["属性错误", "主体错误", "动作错误", "结构畸变", "台词错误", "角色突变"].includes(secondary)) value += 0.08;
+      if (["构图问题", "镜头设计问题", "色彩问题", "节奏问题", "情绪表达错误"].includes(secondary)) value -= 0.08;
+      return Math.max(0.12, Math.min(0.82, value));
+    }
+
+    function targetRecall(row, profile) {
+      const jitter = (hashText(`recall|${row.label}`) % 9) / 100;
+      let value = 0.28 + objectiveStrength(row.primary, row.secondary) * 0.38 + jitter + profile.recallBonus;
+      if (profile.highRecallLabels.includes(row.label)) value = 0.90 + (hashText(`hr|${row.label}`) % 4) / 100;
+      if (profile.greenPrecisionLabels.includes(row.label)) value = Math.max(value, 0.74 + (hashText(`gr|${row.label}`) % 8) / 100);
+      if (profile.orangePrecisionLabels.includes(row.label)) value = Math.max(value, 0.52 + (hashText(`or|${row.label}`) % 14) / 100);
+      if (profile.redBothLabels.includes(row.label)) value = 0.18 + (hashText(`rb-r|${row.label}`) % 10) / 100;
+      if (row.primary === "审美质量") value -= 0.08;
+      if (row.primary === "安全与合规") value -= 0.06;
+      return Math.max(0.12, Math.min(profile.recallCap, value));
+    }
+
+    function targetPrecision(row, profile) {
+      const jitter = (hashText(`precision|${row.label}`) % 7) / 100;
+      let value = 0.10 + objectiveStrength(row.primary, row.secondary) * 0.18 + jitter + profile.precisionBonus;
+      if (profile.highPrecisionLabels.includes(row.label)) value = 0.50 + (hashText(`hp|${row.label}`) % 6) / 100;
+      if (profile.greenPrecisionLabels.includes(row.label)) return 0.72 + (hashText(`gp|${row.label}`) % 9) / 100;
+      if (profile.orangePrecisionLabels.includes(row.label)) return 0.45 + (hashText(`op|${row.label}`) % 16) / 100;
+      if (profile.redBothLabels.includes(row.label)) return 0.14 + (hashText(`rb-p|${row.label}`) % 10) / 100;
+      if (row.primary === "审美质量") value -= 0.05;
+      if (row.primary === "时间一致性") value -= 0.03;
+      return Math.max(0.04, Math.min(profile.precisionCap, value));
+    }
+
+    function generateMetrics(version) {
+      const profile = datasetProfiles[version];
+      return labelRows.map(row => {
+        const support = supportCount(row.primary, row.secondary);
+        const recall = targetRecall(row, profile);
+        const precision = targetPrecision(row, profile);
+        const tp = Math.max(1, Math.min(support, Math.round(support * recall)));
+        let predicted = Math.max(tp, Math.round(tp / Math.max(precision, 0.01)));
+        if (version === "baseline") {
+          const improvedProfile = datasetProfiles.improved;
+          const improvedRecall = targetRecall(row, improvedProfile);
+          const improvedPrecision = targetPrecision(row, improvedProfile);
+          const improvedTp = Math.max(1, Math.min(support, Math.round(support * improvedRecall)));
+          const improvedPredicted = Math.max(improvedTp, Math.round(improvedTp / Math.max(improvedPrecision, 0.01)));
+          predicted = Math.max(predicted, improvedPredicted + 20 + (hashText(`over|${row.label}`) % 6));
+          predicted = Math.max(predicted, Math.ceil(tp / profile.precisionCap));
+        }
+        predicted = Math.min(100, predicted);
+        const fp = Math.max(0, predicted - tp);
+        const fn = Math.max(0, support - tp);
+        const actualPrecision = predicted === 0 ? null : tp / predicted;
+        const actualRecall = support === 0 ? null : tp / support;
+        const f1 = actualPrecision === null || actualRecall === null || actualPrecision + actualRecall === 0
+          ? null
+          : 2 * actualPrecision * actualRecall / (actualPrecision + actualRecall);
+
+        return { ...row, tp, fp, fn, support, predicted, precision: actualPrecision, recall: actualRecall, f1 };
+      });
+    }
+
+    function labelPoolForVideo(videoId, rows, salt, maxCount) {
+      return rows
+        .map(row => ({ row, value: score(videoId, row.label, salt) }))
+        .sort((a, b) => a.value - b.value)
+        .slice(0, maxCount)
+        .map(item => item.row.label);
+    }
+
+    function generateVideos(version, metricRows) {
+      return Array.from({ length: 100 }, (_, i) => {
+        const id = `VID-${String(i + 1).padStart(3, "0")}`;
+        const human = new Set(labelPoolForVideo(id, metricRows, `${version}|human`, 2 + (hashText(`${id}|h`) % 4)));
+        const model = new Set(labelPoolForVideo(id, metricRows, `${version}|model`, 3 + (hashText(`${id}|m`) % 6)));
+        return { id, human, model };
+      });
+    }
+
+    let currentVersion = "baseline";
+    let metrics = generateMetrics(currentVersion);
+    let videos = generateVideos(currentVersion, metrics);
+
+    function rebuildDataset(version) {
+      currentVersion = version;
+      metrics = generateMetrics(version);
+      videos = generateVideos(version, metrics);
+      renderTable();
+    }
+
+    const state = {
+      sortKey: "f1",
+      sortDir: "asc",
+      primary: "全部",
+      search: "",
+      hideZeroSupport: true,
+      showLowOnly: false
+    };
+
+    const tbody = document.querySelector("#metricTable tbody");
+    const datasetVersion = document.querySelector("#datasetVersion");
+    const primaryFilter = document.querySelector("#primaryFilter");
+    const searchInput = document.querySelector("#searchInput");
+    const hideZeroSupport = document.querySelector("#hideZeroSupport");
+    const showLowOnly = document.querySelector("#showLowOnly");
+
+    function percent(value) {
+      if (value === null || Number.isNaN(value)) return "--";
+      return `${Math.round(value * 1000) / 10}%`;
+    }
+
+    function rateClass(value) {
+      if (value === null) return "low";
+      if (value >= 0.70) return "";
+      if (value >= 0.40) return "mid";
+      return "low";
+    }
+
+    function rateCell(value) {
+      const width = value === null ? 0 : Math.round(value * 100);
+      return `
+        <div class="bar">
+          <span>${percent(value)}</span>
+          <span class="track"><span class="fill ${rateClass(value)}" style="width:${width}%"></span></span>
+        </div>
+      `;
+    }
+
+    function filteredMetrics() {
+      const q = state.search.trim().toLowerCase();
+      return metrics.filter(row => {
+        if (state.primary !== "全部" && row.primary !== state.primary) return false;
+        if (state.hideZeroSupport && row.support === 0) return false;
+        if (state.showLowOnly && (row.f1 === null || row.f1 >= 0.8)) return false;
+        if (q && !`${row.primary} ${row.secondary} ${row.label}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+
+    function compare(a, b, key) {
+      const av = a[key];
+      const bv = b[key];
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      if (typeof av === "number" && typeof bv === "number") return av - bv;
+      return String(av).localeCompare(String(bv), "zh-Hans-CN");
+    }
+
+    function sortedRows() {
+      return filteredMetrics().sort((a, b) => {
+        const value = compare(a, b, state.sortKey);
+        return state.sortDir === "asc" ? value : -value;
+      });
+    }
+
+    function renderTable() {
+      const rows = sortedRows();
+      tbody.innerHTML = rows.map(row => `
+        <tr>
+          <td><span class="tag">${row.primary}</span></td>
+          <td>
+            <span class="pair">
+              <strong>${row.secondary}</strong>
+              <small>${row.label}</small>
+            </span>
+          </td>
+          <td class="num">${row.support}</td>
+          <td class="num">${row.predicted}</td>
+          <td class="num">${row.tp}</td>
+          <td class="num">${row.fp}</td>
+          <td class="num">${row.fn}</td>
+          <td class="num rate">${rateCell(row.precision)}</td>
+          <td class="num rate">${rateCell(row.recall)}</td>
+          <td class="num rate">${rateCell(row.f1)}</td>
+        </tr>
+      `).join("");
+
+      document.querySelectorAll("th .sort").forEach(item => item.textContent = "");
+      const active = document.querySelector(`th[data-key="${state.sortKey}"] .sort`);
+      if (active) active.textContent = state.sortDir === "asc" ? "↑" : "↓";
+      renderSummary(rows);
+    }
+
+    function average(values) {
+      const valid = values.filter(value => value !== null && !Number.isNaN(value));
+      if (valid.length === 0) return null;
+      return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+    }
+
+    function renderSummary(rows) {
+      const all = rows.length ? rows : metrics;
+      const tp = all.reduce((sum, row) => sum + row.tp, 0);
+      const fp = all.reduce((sum, row) => sum + row.fp, 0);
+      const fn = all.reduce((sum, row) => sum + row.fn, 0);
+      const microP = tp + fp === 0 ? null : tp / (tp + fp);
+      const microR = tp + fn === 0 ? null : tp / (tp + fn);
+      const microF1 = microP === null || microR === null || microP + microR === 0 ? null : 2 * microP * microR / (microP + microR);
+
+      document.querySelector("#videoCount").textContent = videos.length;
+      document.querySelector("#macroPrecision").textContent = percent(average(all.map(row => row.precision)));
+      document.querySelector("#macroRecall").textContent = percent(average(all.map(row => row.recall)));
+      document.querySelector("#microF1").textContent = percent(microF1);
+    }
+
+    function fillFilters() {
+      primaryFilter.innerHTML = ["全部", ...Object.keys(labelOntology)]
+        .map(name => `<option value="${name}">${name}</option>`)
+        .join("");
+    }
+
+    function downloadCsv() {
+      const rows = sortedRows();
+      const header = ["一级标签", "二级标签", "人标正例", "链路命中", "TP", "FP", "FN", "准确率", "召回率", "F1"];
+      const lines = [header, ...rows.map(row => [
+        row.primary,
+        row.secondary,
+        row.support,
+        row.predicted,
+        row.tp,
+        row.fp,
+        row.fn,
+        percent(row.precision),
+        percent(row.recall),
+        percent(row.f1)
+      ])].map(cols => cols.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","));
+
+      const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "label_metrics_dashboard.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    document.querySelectorAll("th[data-key]").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        if (state.sortKey === key) {
+          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.sortKey = key;
+          state.sortDir = ["primary", "secondary"].includes(key) ? "asc" : "desc";
+        }
+        renderTable();
+      });
+    });
+
+    datasetVersion.addEventListener("change", event => {
+      rebuildDataset(event.target.value);
+    });
+
+    primaryFilter.addEventListener("change", event => {
+      state.primary = event.target.value;
+      renderTable();
+    });
+
+    searchInput.addEventListener("input", event => {
+      state.search = event.target.value;
+      renderTable();
+    });
+
+    hideZeroSupport.addEventListener("change", event => {
+      state.hideZeroSupport = event.target.checked;
+      renderTable();
+    });
+
+    showLowOnly.addEventListener("change", event => {
+      state.showLowOnly = event.target.checked;
+      renderTable();
+    });
+
+    document.querySelector("#resetSort").addEventListener("click", () => {
+      state.sortKey = "f1";
+      state.sortDir = "asc";
+      renderTable();
+    });
+
+    document.querySelector("#downloadCsv").addEventListener("click", downloadCsv);
+
+    fillFilters();
+    rebuildDataset(currentVersion);
+  </script>
+</body>
+</html>
